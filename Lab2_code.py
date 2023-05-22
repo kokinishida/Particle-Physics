@@ -50,6 +50,10 @@ def F(x, A, s, N, tau, alpha, x0, gamma):
     return A * (((1 - s) * fb(x, N, tau)) + s * V(x, x0, alpha, gamma))
 
 
+def F_bg_only(x, A, s, N, tau, alpha, x0, gamma):
+    return A * (((1 - s) * fb(x, N, tau)))
+
+
 def fb(x, N, tau):
     return N * np.exp((-x) / tau)
 
@@ -103,9 +107,9 @@ if __name__ == "__main__":
     # use the calculated s from popt to plot background
     p_backgr = popt.copy()
     p_backgr[1] = 0
-    print(p_backgr)
+
     Fdata1 = [F(x, *p_backgr) for x in xdata]
-    plt.plot(xdata, Fdata1, "b-")
+    # plt.plot(xdata, Fdata1, "b-")
 
     plt.show()
     print(popt)
