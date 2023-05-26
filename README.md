@@ -1,2 +1,2 @@
-# P121-Lab
+# Particle Physics
 Data analysis in particle physics using python
