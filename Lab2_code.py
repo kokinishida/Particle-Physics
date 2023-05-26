@@ -16,6 +16,10 @@ def readfile():
                 # ['Muon', '1', 'Pt', '13.122', 'Eta', '0.524', 'Phi', '-2.795', 'Charge', '-1', 'Iso', '1.277']
                 muon1 = f.readline().split()
                 muon2 = f.readline().split()
+                # filter same charges
+                if muon1[9] == muon2[9]:
+                    continue
+
                 # interested in indexes 3,5,7,9,11
                 px1 = float(muon1[3]) * m.cos(float(muon1[7]))
                 px2 = float(muon2[3]) * m.cos(float(muon2[7]))
@@ -46,12 +50,20 @@ def readfile():
     return output
 
 
+def histogram(data, bins, range, edgecolor, color, alpha):
+    n, bin, _ = plt.hist(
+        data,
+        bins=bins,
+        range=range,
+        edgecolor=edgecolor,
+        color=color,
+        alpha=alpha,
+    )
+    return n, bin
+
+
 def F(x, A, s, N, tau, alpha, x0, gamma):
-    return A * (((1 - s) * fb(x, N, tau)) + s * V(x, x0, alpha, gamma))
-
-
-def F_bg_only(x, A, s, N, tau, alpha, x0, gamma):
-    return A * (((1 - s) * fb(x, N, tau)))
+    return A * (((1 - s) * fb(x - x0, N, tau)) + s * V(x, x0, alpha, gamma))
 
 
 def fb(x, N, tau):
@@ -73,23 +85,18 @@ def V(x, x0, alpha, gamma):
 if __name__ == "__main__":
     # read and calculate data
     output = readfile()
-
     # plot histogram
     mass = [output[i][0] for i in range(len(output))]
     plt.figure(1)
     plt.style.use("ggplot")
-    n, bin, _ = plt.hist(
-        mass, bins=100, range=[70, 110], edgecolor="black", color="green"
-    )
-    plt.title(f"Invariant Mass of Muon Pairs", fontsize=10)
-    plt.xlabel("Mass[GeV]", fontsize=8)
-    plt.ylabel("Entries/bin", fontsize=8)
+    n, bin = histogram(mass, 200, [70, 110], "black", "green", 0.75)
+
     # curve fitting
     bin_centers = (bin[:-1] + bin[1:]) / 2
     xdata = bin_centers
     ydata = n
     # [A,s,N,tau,alpha,x0,gamma]
-    guess = [4000, 0.78, 30, 10, 2.7, 90, 1]
+    guess = [50000, 0.78, 0.01, 10, 2.7, 90, 1]
     popt, pcov = curve_fit(
         F,
         xdata,
@@ -102,15 +109,24 @@ if __name__ == "__main__":
     )
 
     Fdata = [F(x, *popt) for x in xdata]
-    plt.plot(xdata, Fdata, "r-")
+    plt.plot(xdata, Fdata, "r-", label="Sig + Bg")
 
     # use the calculated s from popt to plot background
     p_backgr = popt.copy()
-    p_backgr[1] = 0
-
+    p_backgr[1] = 0  # s=0
     Fdata1 = [F(x, *p_backgr) for x in xdata]
-    # plt.plot(xdata, Fdata1, "b-")
+    plt.plot(xdata, Fdata1, "b--", label="Background")
 
+    # finish up figure
+    plt.title(f"Invariant Mass of Muon Pairs", fontsize=10)
+    plt.xlabel("Mass[GeV]", fontsize=8)
+    plt.ylabel("Entries/bin", fontsize=8)
+    plt.legend(loc="best", fontsize=10)
     plt.show()
+
+    print("parameters")
     print(popt)
-    print(pcov)
+    print()
+    # calculate uncertainty
+    cov = pcov[1][1]
+    print(f"Signal fraction: {popt[1]}\nUncertainty (St. dev):{np.sqrt(cov)}")
