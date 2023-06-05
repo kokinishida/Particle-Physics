@@ -20,7 +20,7 @@ def readfile(max_iso):
                 # filter same charges
                 if muon1[9] == muon2[9]:
                     continue
-                # isolation requirement < 5.0 then calculate invariant mass and store into output
+                # isolation requirement < max_iso then calculate invariant mass and store into output
                 if (
                     0 <= float(muon1[11]) <= max_iso
                     and 0 <= float(muon2[11]) <= max_iso
@@ -97,23 +97,72 @@ def FB(x, A, s, tau, x0):
     return A * ((1 - s) * fb(x, x0, tau))
 
 
-def optimize():
-    """this function optimizes the uncertainty using the curve_fit function using different values of isolation
-    thresholds
-    returns the isolation value that gives the minimizes uncertainty"""
-    steps = np.arange(0, 5.001, 0.001)
-    for iso in steps:
-        datainfo = 0
+def isolation_distribution():
+    """this function plots the spread of isolation in each muon data"""
+    output = readfile(10)
+    iso1 = []
+    iso2 = []
+    for tuples in output:
+        iso = tuples[1]["isolation"]
+        iso1.append(iso[0])
+        iso2.append(iso[1])
+    plt.scatter(iso1, iso2, s=0.01, alpha=0.75)  # s: marker size, alpha: transparency
     return
 
 
+def optimize(upper, lower, step):
+    """this function optimizes the uncertainty using the curve_fit function using different values of isolation
+    thresholds
+    returns the isolation value that gives the minimizes uncertainty
+    returns: [(isolation, signal frac, uncertainty),]"""
+    steps = np.arange(upper, lower, step)
+    iso_info = []
+    output = readfile(10)
+    for iso in steps:
+        mass = [
+            output[i][0]
+            for i in range(len(output))
+            if (
+                output[i][1]["isolation"][0] <= iso
+                and output[i][1]["isolation"][1] <= iso
+            )
+        ]
+        n, bin = histogram(mass, 200, [70, 110], "black", "green", 0.75, "OS muons")
+        # curve fit
+        xdata = (bin[:-1] + bin[1:]) / 2
+        ydata = n
+        guess = [14000, 0.9, 50, 91.2, 1, 1]
+        popt, pcov = curve_fit(
+            F,
+            xdata,
+            ydata,
+            p0=guess,
+            bounds=(
+                [0, 0, 0, 70, 0, 0],
+                [100000, 1, 1000, 110, 10, 10],
+            ),
+        )
+        sig_frac = popt[1]
+        uncertainty = np.sqrt(pcov[1][1])
+        iso_info.append((iso, sig_frac, uncertainty))
+    return iso_info
+
+
 if __name__ == "__main__":
+    # isolation plot
+    # plt.figure(1)
+    # isolation_distribution()
+    # plt.title(f"Spread of Muon Isolations", fontsize=10)
+    # plt.xlabel("Isolation 1", fontsize=8)
+    # plt.ylabel("Isolation 2", fontsize=8)
+    # plt.show()
+
     # testing for one specific threshold (before implementing an algorithm)
     # read and calculate data
-    output = readfile(5.0)
+    output = readfile(0.157)
     # plot histogram
     mass = [output[i][0] for i in range(len(output))]
-    plt.figure(1)
+    plt.figure(2)
     plt.style.use("ggplot")
     n, bin = histogram(mass, 200, [70, 110], "black", "green", 0.75, "OS muons")
     # curve fitting
@@ -156,3 +205,52 @@ if __name__ == "__main__":
         print(np.sqrt(pcov[i][i]))
     cov = pcov[1][1]
     print(f"Signal fraction: {popt[1]}\nUncertainty (St. dev):{np.sqrt(cov)}")
+
+    # implement optimization algorithm and plot the histogram with the least uncertainty
+    # iso_info = optimize(5, 0, -0.1)
+    # optimal = [
+    #     iso_info[i]
+    #     for i in range(len(iso_info))
+    #     if iso_info[i][2] == min([iso_info[j][2] for j in range(len(iso_info))])
+    # ]
+    # print(optimal)  # ans = 0.2
+
+    # second scan
+    # iso_info2 = optimize(0.3, 0.1, -0.01)
+    # optimal2 = [
+    #     iso_info2[i]
+    #     for i in range(len(iso_info2))
+    #     if iso_info2[i][2] == min([iso_info2[j][2] for j in range(len(iso_info2))])
+    # ]
+    # print(optimal2)  # ans = 0.16
+
+    # # # third scan
+    # iso_info3 = optimize(0.17, 0.15, -0.001)  # ans = 0.157
+    # optimal3 = [
+    #     iso_info3[i]
+    #     for i in range(len(iso_info3))
+    #     if iso_info3[i][2] == min([iso_info3[j][2] for j in range(len(iso_info3))])
+    # ]
+    # print(optimal3)  # ans = 0.157
+
+    # plt.figure(3).tight_layout()
+    # plt.subplot(1, 2, 1)
+    # isos = [iso_info2[i][0] for i in range(len(iso_info2))]
+    # sigf = [iso_info2[i][1] for i in range(len(iso_info2))]
+    # unc = [iso_info2[i][2] for i in range(len(iso_info2))]
+    # plt.plot(isos, unc, "o-")
+    # plt.ylim([0.001, 0.003])
+    # plt.title(f"Isolation vs Uncertainty of Signal Fraction", fontsize=10)
+    # plt.xlabel("Isolation Threshold", fontsize=8)
+    # plt.ylabel("Uncertainty", fontsize=8)
+
+    # plt.subplot(1, 2, 2)
+    # isos2 = [iso_info3[i][0] for i in range(len(iso_info3))]
+    # sigf2 = [iso_info3[i][1] for i in range(len(iso_info3))]
+    # unc2 = [iso_info3[i][2] for i in range(len(iso_info3))]
+    # plt.plot(isos2, unc2, "o-")
+    # plt.ylim([0.0018, 0.0019])
+    # plt.title(f"Isolation vs Uncertainty of Signal Fraction", fontsize=10)
+    # plt.xlabel("Isolation Threshold", fontsize=8)
+    # plt.ylabel("Uncertainty", fontsize=8)
+    # plt.show()
